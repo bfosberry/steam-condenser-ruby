@@ -89,6 +89,21 @@ module SteamCondenser::Community
     # @return [Fixnum] This Steam ID's visibility State
     attr_reader :visibility_state
 
+    # Returns the id of the current game this user is playing
+    #
+    # @return [Fixnum] The id of this users current game
+    attr_reader :game_id
+
+    # Returns the name of the current game this user is playing
+    #
+    # @return [String] The name of this users current game
+    attr_reader :game_name
+
+    # Returns the id of the current game server this user is playing
+    #
+    # @return [Fixnum] The id of this users current game server
+    attr_reader :game_server_id
+
     # Converts a 64bit numeric SteamID as used by the Steam Community to the
     # legacy SteamID format
     #
@@ -251,6 +266,28 @@ module SteamCondenser::Community
         @member_since = Time.parse profile['memberSince']
         @real_name    = CGI.unescapeHTML profile['realname'] || ''
         @summary      = CGI.unescapeHTML profile['summary'] || ''
+
+        @most_played_games = {}
+        [(profile['mostPlayedGames'] || {})['mostPlayedGame']].compact.flatten.each do |most_played_game|
+          @most_played_games[most_played_game['gameName']] = most_played_game['hoursPlayed'].to_f
+        end
+
+        @groups = []
+        [(profile['groups'] || {})['group']].compact.flatten.each do |group|
+          @groups << SteamGroup.new(group['groupID64'].to_i, false)
+        end
+
+        @links = {}
+        [(profile['weblinks'] || {})['weblink']].compact.flatten.each do |link|
+          @links[CGI.unescapeHTML link['title']] = link['link']
+        end
+
+        summary_data = fetch_summary(@steam_id64)
+        if summary_data
+          @game_id = summary_data[:game_id]
+          @game_name = summary_data[:game_name]
+          @game_server_id = summary_data[:game_server_id]
+        end
       end
     rescue
       raise $! if $!.is_a? SteamCondenser::Error
@@ -316,6 +353,29 @@ module SteamCondenser::Community
       end
 
       @groups
+    end
+
+    # Fetches the users summary data
+    #
+    # This returns summaries for a given user id, this call requires
+    # an api key to be set
+    #
+    # @see @game_id
+    # @see @game_server_id
+    # @see game_name
+    def fetch_summary(id)
+      params = { :steamids => id }
+
+      if WebApi.api_key
+        summary_data = WebApi.json 'ISteamUser', 'GetPlayerSummaries', 2, params
+        data = summary_data[:response][:players].first || {}
+
+        {
+          :game_id => data[:gameid],
+          :game_name => data[:gameextrainfo],
+          :game_server_id => data[:gameserversteamid]
+        }
+      end
     end
 
     # Returns the URL of the full-sized version of this user's avatar
