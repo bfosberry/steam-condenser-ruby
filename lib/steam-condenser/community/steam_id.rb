@@ -305,12 +305,14 @@ module SteamCondenser::Community
       @games            = {}
       @recent_playtimes = {}
       @total_playtimes  = {}
-      games_data[:response][:games].each do |game_data|
-        app_id = game_data[:appid]
-        @games[app_id] = SteamGame.new app_id, game_data
-
-        @recent_playtimes[app_id] = game_data[:playtime_2weeks] || 0
-        @total_playtimes[app_id]  = game_data[:playtime_forever] || 0
+      
+      if games_data[:response][:games] 
+        games_data[:response][:games].each do |game_data|
+          app_id = game_data[:appid]
+          @games[app_id] = SteamGame.new app_id, game_data
+          @recent_playtimes[app_id] = game_data[:playtime_2weeks] || 0
+          @total_playtimes[app_id]  = game_data[:playtime_forever] || 0
+        end
       end
 
       @games
